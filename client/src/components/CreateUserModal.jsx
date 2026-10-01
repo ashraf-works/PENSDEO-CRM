@@ -76,6 +76,7 @@ export default function CreateUserModal({ isOpen, onClose, onUserCreated }) {
           name,
           username: username || name.toLowerCase().replace(/\s+/g, '_'),
           email: email || `${username || 'user'}@agency.com`,
+          password,
           role,
           departmentNames: selectedDepts,
         };
