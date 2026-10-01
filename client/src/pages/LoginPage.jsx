@@ -18,33 +18,71 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const res = await api.login({ email, password }).catch(() => null);
-      if (res && res.token && res.user) {
-        setCurrentUser(res.user, res.token);
-        if (res.user.role === 'SuperAdmin' || res.user.role === 'Manager') navigate('/admin');
-        else if (res.user.role === 'Client') navigate('/client');
+      const res = await api.login({ email: email.trim(), password });
+      
+      if (res && (res.token || res.user)) {
+        const userObj = res.user || {
+          _id: res._id,
+          name: res.name,
+          email: res.email,
+          role: res.role,
+          department: res.department,
+          assignedProjects: res.assignedProjects,
+        };
+        const token = res.token || 'demo_jwt_token_2026';
+
+        setCurrentUser(userObj, token);
+        if (userObj.role === 'SuperAdmin' || userObj.role === 'Manager') navigate('/admin');
+        else if (userObj.role === 'Client') navigate('/client');
         else navigate('/employee');
         return;
       }
     } catch (err) {
-      console.warn('Backend login fallback to demo persona:', err.message);
+      console.warn('API Login Error:', err.message);
+
+      // If backend returned an explicit error response (e.g. 401 Invalid Credentials)
+      if (err.message && !err.message.includes('Failed to fetch') && !err.message.includes('NetworkError') && !err.message.includes('API Request Failed')) {
+        setErrorMsg(err.message || 'Invalid email or password.');
+        setLoading(false);
+        return;
+      }
+
+      // Offline / Demo fallback matching against stored session users
+      const storedUsersRaw = localStorage.getItem('pensdeo_users');
+      const defaultUsers = [
+        { _id: 'usr_1', name: 'Alex Vance', email: 'admin@agency.com', role: 'SuperAdmin', password: 'password123' },
+        { _id: 'usr_2', name: 'Sarah Jenkins', email: 'sarah@agency.com', role: 'Manager', password: 'password123' },
+        { _id: 'usr_3', name: 'David Miller', email: 'david@agency.com', role: 'Employee', password: 'password123' },
+        { _id: 'usr_4', name: 'Elena Rostova', email: 'elena@agency.com', role: 'Employee', password: 'password123' },
+        { _id: 'usr_5', name: 'Acme Corp', email: 'client@acmecorp.com', role: 'Client', password: 'password123' },
+      ];
+
+      let allUsers = defaultUsers;
+      if (storedUsersRaw) {
+        try {
+          const parsed = JSON.parse(storedUsersRaw);
+          allUsers = [...parsed, ...defaultUsers];
+        } catch (e) {}
+      }
+
+      const cleanEmail = email.trim().toLowerCase();
+      const match = allUsers.find(
+        (u) =>
+          (u.email && u.email.toLowerCase() === cleanEmail) ||
+          (u.username && u.username.toLowerCase() === cleanEmail)
+      );
+
+      if (match) {
+        setCurrentUser(match, 'demo_jwt_token_2026');
+        if (match.role === 'SuperAdmin' || match.role === 'Manager') navigate('/admin');
+        else if (match.role === 'Client') navigate('/client');
+        else navigate('/employee');
+        return;
+      }
+
+      setErrorMsg('Invalid credentials. User account does not exist or password is incorrect.');
     } finally {
       setLoading(false);
-    }
-
-    // Default demo persona fallback
-    if (email.includes('admin')) {
-      switchRole('SuperAdmin');
-      navigate('/admin');
-    } else if (email.includes('client')) {
-      switchRole('Client');
-      navigate('/client');
-    } else if (email.includes('david') || email.includes('employee')) {
-      switchRole('Employee');
-      navigate('/employee');
-    } else {
-      switchRole('Manager');
-      navigate('/admin');
     }
   };
 
@@ -64,6 +102,13 @@ export default function LoginPage() {
             Employee logs work → Admin controls it → Client gets transparent view
           </p>
         </div>
+
+        {errorMsg && (
+          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-semibold flex items-center gap-2 shadow-lg">
+            <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div className="space-y-1.5">
