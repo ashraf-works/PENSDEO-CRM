@@ -5,22 +5,7 @@ import { api } from '../../services/api';
 import EditProjectModal from '../../components/EditProjectModal';
 import RichTextEditor from '../../components/RichTextEditor';
 
-const defaultProjects = [
-  {
-    _id: 'prj_1',
-    title: 'Acme E-Commerce Redesign & SEO',
-    description: 'Comprehensive redesign and search engine optimization audit for Acme Corp online platform.',
-    clientId: { _id: 'usr_5', name: 'Acme Corp (Robert Taylor)', email: 'client@acmecorp.com' },
-    status: 'In Progress',
-    progressPercentage: 65,
-    startDate: '2026-09-01',
-    expectedDelivery: '2026-11-15',
-    assignedTeam: [
-      { _id: 'usr_2', name: 'Sarah Jenkins', department: 'Design' },
-      { _id: 'usr_3', name: 'David Miller', department: 'Development' },
-    ],
-  },
-];
+const defaultProjects = [];
 
 const getStoredProjects = () => {
   try {
@@ -189,7 +174,14 @@ export default function AdminProjects() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
-              {projects.map((project) => (
+              {projects.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="p-8 text-center text-slate-500 text-xs">
+                    No agency projects created yet. Click "Create New Project" to add your first project.
+                  </td>
+                </tr>
+              ) : (
+                projects.map((project) => (
                 <tr key={project._id} className="hover:bg-slate-850/40 transition">
                   <td className="p-4 font-bold text-white space-y-1">
                     <div>{project.title}</div>
@@ -248,7 +240,8 @@ export default function AdminProjects() {
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))
+            )}
             </tbody>
           </table>
         </div>

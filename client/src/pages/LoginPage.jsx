@@ -5,8 +5,8 @@ import { useAppStore } from '../store/useAppStore';
 import { api } from '../services/api';
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('admin@agency.com');
-  const [password, setPassword] = useState('password123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const { setCurrentUser, switchRole } = useAppStore();

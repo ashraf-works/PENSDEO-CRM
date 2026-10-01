@@ -15,26 +15,9 @@ import { useAppStore } from '../../store/useAppStore';
 import { api } from '../../services/api';
 
 export default function ClientDeliverables() {
-  const { token } = useAppStore();
+  const { token, currentUser } = useAppStore();
 
-  const [deliverables, setDeliverables] = useState([
-    {
-      _id: 'del_1',
-      title: 'UI Design System Figma Prototype v2.0',
-      fileUrl: 'https://figma.com/file/acme-design-system-v2',
-      type: 'Design',
-      status: 'Approved',
-      clientFeedback: 'Approved! Love the modern dark glassmorphism aesthetic and responsive layouts.',
-    },
-    {
-      _id: 'del_2',
-      title: 'SEO Strategy & Competitor Audit Report Q4',
-      fileUrl: 'https://storage.agency.com/deliverables/seo-audit-acme.pdf',
-      type: 'Report',
-      status: 'Pending Review',
-      clientFeedback: '',
-    },
-  ]);
+  const [deliverables, setDeliverables] = useState([]);
 
   // Modal State for Request Changes feedback
   const [selectedDeliverable, setSelectedDeliverable] = useState(null);
@@ -43,14 +26,32 @@ export default function ClientDeliverables() {
 
   useEffect(() => {
     fetchDeliverables();
-  }, []);
+  }, [currentUser]);
 
   const fetchDeliverables = async () => {
     try {
       const data = await api.getDeliverables(token);
-      if (data && data.length > 0) setDeliverables(data);
+      const storedProjectsRaw = localStorage.getItem('pensdeo_projects');
+      let clientProjectIds = new Set();
+      if (storedProjectsRaw) {
+        try {
+          const parsed = JSON.parse(storedProjectsRaw);
+          parsed.forEach((p) => {
+            if (p.clientId === currentUser?._id || p.clientId?._id === currentUser?._id || p.clientId?.email === currentUser?.email) {
+              clientProjectIds.add(p._id);
+            }
+          });
+        } catch (e) {}
+      }
+
+      if (data && Array.isArray(data)) {
+        const filtered = data.filter((d) => clientProjectIds.has(d.projectId) || clientProjectIds.has(d.projectId?._id));
+        setDeliverables(filtered);
+      } else {
+        setDeliverables([]);
+      }
     } catch (err) {
-      console.log('Using default client deliverables list.');
+      setDeliverables([]);
     }
   };
 
@@ -126,8 +127,13 @@ export default function ClientDeliverables() {
       </div>
 
       {/* Deliverables Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {deliverables.map((item) => (
+      {deliverables.length === 0 ? (
+        <div className="p-12 text-center text-slate-500 text-xs bg-slate-900 border border-slate-800 rounded-2xl">
+          No project deliverables uploaded for client review yet.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {deliverables.map((item) => (
           <div
             key={item._id}
             className={`p-6 rounded-2xl border flex flex-col justify-between space-y-5 transition-all ${
@@ -205,7 +211,8 @@ export default function ClientDeliverables() {
             )}
           </div>
         ))}
-      </div>
+        </div>
+      )}
 
       {/* REQUEST CHANGES MODAL */}
       {showModal && selectedDeliverable && (

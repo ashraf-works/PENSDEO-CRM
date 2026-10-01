@@ -21,65 +21,29 @@ import { useAppStore } from '../../store/useAppStore';
 import { api } from '../../services/api';
 
 export default function ClientOverview() {
-  const { token } = useAppStore();
+  const { token, currentUser } = useAppStore();
   const [loading, setLoading] = useState(false);
 
   // Project state
-  const [project, setProject] = useState({
-    _id: 'prj_1',
-    title: 'Acme E-Commerce Redesign & SEO',
-    startDate: '2026-09-01',
-    expectedDelivery: '2026-11-15',
-    progressPercentage: 65,
-    status: 'In Progress',
-  });
+  const [project, setProject] = useState(null);
 
   // Task Stats
   const [taskStats, setTaskStats] = useState({
-    total: 3,
-    completed: 1,
-    inProgress: 1,
+    total: 0,
+    completed: 0,
+    inProgress: 0,
     overdue: 0,
   });
 
-  // Today's Activity Timeline (Client-visible updates with employee attachments)
-  const [timelineUpdates, setTimelineUpdates] = useState([
-    {
-      _id: 'upd_1',
-      time: '2:30 PM',
-      department: 'Development',
-      employeeName: 'David Miller',
-      description: 'Integrated Stripe API SDK checkout gateway and optimized webhooks for cart authorization.',
-      timeSpent: 240,
-      attachments: [
-        { fileName: 'stripe-checkout-preview.png', fileUrl: '/uploads/sample-screenshot.png', fileType: 'image/png' },
-      ],
-    },
-    {
-      _id: 'upd_3',
-      time: '4:00 PM (Yesterday)',
-      department: 'SEO',
-      employeeName: 'Elena Rostova',
-      description: 'Completed sitemap XML submission and schema structured data validation for search engine indexation.',
-      timeSpent: 180,
-      attachments: [],
-    },
-  ]);
+  // Today's Activity Timeline
+  const [timelineUpdates, setTimelineUpdates] = useState([]);
 
   // Deliverables
-  const [pendingDeliverables, setPendingDeliverables] = useState([
-    {
-      _id: 'del_2',
-      title: 'SEO Strategy & Competitor Audit Q4',
-      fileUrl: 'https://storage.agency.com/deliverables/seo-audit-acme.pdf',
-      type: 'Report',
-      status: 'Pending Review',
-    },
-  ]);
+  const [pendingDeliverables, setPendingDeliverables] = useState([]);
 
   useEffect(() => {
     fetchClientData();
-  }, []);
+  }, [currentUser]);
 
   const fetchClientData = async () => {
     setLoading(true);
@@ -91,21 +55,56 @@ export default function ClientOverview() {
         api.getDeliverables(token).catch(() => null),
       ]);
 
-      if (fetchedProjects && fetchedProjects.length > 0) setProject(fetchedProjects[0]);
-      if (fetchedUpdates && fetchedUpdates.length > 0) setTimelineUpdates(fetchedUpdates);
-      if (fetchedDeliverables && fetchedDeliverables.length > 0) {
-        setPendingDeliverables(fetchedDeliverables.filter((d) => d.status === 'Pending Review'));
+      const storedProjectsRaw = localStorage.getItem('pensdeo_projects');
+      let allProjects = Array.isArray(fetchedProjects) ? fetchedProjects : [];
+      if (storedProjectsRaw) {
+        try {
+          const parsed = JSON.parse(storedProjectsRaw);
+          allProjects = [...allProjects, ...parsed];
+        } catch (e) {}
       }
 
-      if (fetchedTasks) {
-        const total = fetchedTasks.length;
-        const completed = fetchedTasks.filter((t) => t.status === 'Completed').length;
-        const inProgress = fetchedTasks.filter((t) => t.status === 'In Progress').length;
-        const overdue = fetchedTasks.filter((t) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Completed').length;
-        setTaskStats({ total, completed, inProgress, overdue });
+      const clientEmail = currentUser?.email?.toLowerCase();
+      const clientId = currentUser?._id;
+
+      const myProject = allProjects.find((p) => {
+        if (!p) return false;
+        if (p.clientId === clientId || p.clientId?._id === clientId) return true;
+        if (p.clientId?.email?.toLowerCase() === clientEmail) return true;
+        if (typeof p.clientName === 'string' && currentUser?.name && p.clientName.toLowerCase().includes(currentUser.name.toLowerCase())) return true;
+        return false;
+      });
+
+      if (myProject) {
+        setProject(myProject);
+
+        if (Array.isArray(fetchedTasks)) {
+          const myTasks = fetchedTasks.filter((t) => t.projectId === myProject._id || t.projectId?._id === myProject._id);
+          const total = myTasks.length;
+          const completed = myTasks.filter((t) => t.status === 'Completed').length;
+          const inProgress = myTasks.filter((t) => t.status === 'In Progress').length;
+          const overdue = myTasks.filter((t) => t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Completed').length;
+          setTaskStats({ total, completed, inProgress, overdue });
+        }
+
+        if (Array.isArray(fetchedUpdates)) {
+          setTimelineUpdates(fetchedUpdates.filter((u) => (u.projectId === myProject._id || u.projectId?._id === myProject._id) && u.visibility !== 'Internal Only'));
+        }
+
+        if (Array.isArray(fetchedDeliverables)) {
+          setPendingDeliverables(
+            fetchedDeliverables.filter((d) => (d.projectId === myProject._id || d.projectId?._id === myProject._id) && d.status === 'Pending Review')
+          );
+        }
+      } else {
+        setProject(null);
+        setTimelineUpdates([]);
+        setPendingDeliverables([]);
+        setTaskStats({ total: 0, completed: 0, inProgress: 0, overdue: 0 });
       }
     } catch (err) {
-      console.log('Using default mock data for Client Dashboard Overview.');
+      console.log('Using isolated client view.');
+      setProject(null);
     } finally {
       setLoading(false);
     }
@@ -118,6 +117,20 @@ export default function ClientOverview() {
   };
 
   const health = getProjectHealth();
+
+  if (!project) {
+    return (
+      <div className="max-w-4xl mx-auto py-16 text-center space-y-4">
+        <div className="w-16 h-16 bg-slate-900 border border-slate-800 rounded-2xl mx-auto flex items-center justify-center shadow-xl">
+          <FolderKanban className="w-8 h-8 text-indigo-400" />
+        </div>
+        <h2 className="text-xl font-bold text-white">No Active Project Assigned</h2>
+        <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
+          Welcome to PENSDEO Workspace, <span className="text-indigo-400 font-semibold">{currentUser?.name || currentUser?.email}</span>! Your agency project manager has not assigned an active project to your client portal yet.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">

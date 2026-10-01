@@ -4,34 +4,37 @@ import { useAppStore } from '../../store/useAppStore';
 import { api } from '../../services/api';
 
 export default function ClientTasks() {
-  const { token } = useAppStore();
-  const [tasks, setTasks] = useState([
-    {
-      _id: 'tsk_1',
-      title: 'Build Responsive Checkout Component',
-      status: 'In Progress',
-      priority: 'High',
-      dueDate: '2026-10-05',
-    },
-    {
-      _id: 'tsk_2',
-      title: 'On-Page Technical SEO Audit',
-      status: 'Internal Review',
-      priority: 'Medium',
-      dueDate: '2026-10-02',
-    },
-  ]);
+  const { token, currentUser } = useAppStore();
+  const [tasks, setTasks] = useState([]);
 
   useEffect(() => {
     fetchTasks();
-  }, []);
+  }, [currentUser]);
 
   const fetchTasks = async () => {
     try {
       const data = await api.getTasks(token);
-      if (data && data.length > 0) setTasks(data);
+      const storedProjectsRaw = localStorage.getItem('pensdeo_projects');
+      let clientProjectIds = new Set();
+      if (storedProjectsRaw) {
+        try {
+          const parsed = JSON.parse(storedProjectsRaw);
+          parsed.forEach((p) => {
+            if (p.clientId === currentUser?._id || p.clientId?._id === currentUser?._id || p.clientId?.email === currentUser?.email) {
+              clientProjectIds.add(p._id);
+            }
+          });
+        } catch (e) {}
+      }
+
+      if (data && Array.isArray(data)) {
+        const filtered = data.filter((t) => clientProjectIds.has(t.projectId) || clientProjectIds.has(t.projectId?._id));
+        setTasks(filtered);
+      } else {
+        setTasks([]);
+      }
     } catch (err) {
-      console.log('Using default client tasks list.');
+      setTasks([]);
     }
   };
 
@@ -52,7 +55,12 @@ export default function ClientTasks() {
       </div>
 
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-800">
-        {tasks.map((task) => (
+        {tasks.length === 0 ? (
+          <div className="p-12 text-center text-slate-500 text-xs">
+            No active project tasks assigned to your client account yet.
+          </div>
+        ) : (
+          tasks.map((task) => (
           <div key={task._id} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="space-y-1">
               <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400 bg-indigo-500/10 px-2 py-0.5 rounded">
@@ -72,7 +80,8 @@ export default function ClientTasks() {
               {task.status}
             </span>
           </div>
-        ))}
+        ))
+      )}
       </div>
     </div>
   );

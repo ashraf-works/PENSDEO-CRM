@@ -4,40 +4,41 @@ import { useAppStore } from '../../store/useAppStore';
 import { api } from '../../services/api';
 
 export default function ClientDailyUpdates() {
-  const { token } = useAppStore();
-  const [updates, setUpdates] = useState([
-    {
-      _id: 'upd_1',
-      description: 'Integrated Stripe API SDK checkout gateway and optimized webhooks for cart authorization.',
-      employeeName: 'David Miller',
-      department: 'Development',
-      timeSpent: 240,
-      createdAt: 'Today, 2:30 PM',
-      attachments: [
-        { fileName: 'stripe-checkout-preview.png', fileUrl: '/uploads/sample-screenshot.png', fileType: 'image/png' },
-      ],
-    },
-    {
-      _id: 'upd_3',
-      description: 'Completed sitemap XML submission and schema structured data validation for search engine indexation.',
-      employeeName: 'Elena Rostova',
-      department: 'SEO',
-      timeSpent: 180,
-      createdAt: 'Yesterday, 4:00 PM',
-      attachments: [],
-    },
-  ]);
+  const { token, currentUser } = useAppStore();
+  const [updates, setUpdates] = useState([]);
 
   useEffect(() => {
     fetchUpdates();
-  }, []);
+  }, [currentUser]);
 
   const fetchUpdates = async () => {
     try {
       const data = await api.getDailyUpdates(token);
-      if (data && data.length > 0) setUpdates(data);
+      const storedProjectsRaw = localStorage.getItem('pensdeo_projects');
+      let clientProjectIds = new Set();
+      if (storedProjectsRaw) {
+        try {
+          const parsed = JSON.parse(storedProjectsRaw);
+          parsed.forEach((p) => {
+            if (p.clientId === currentUser?._id || p.clientId?._id === currentUser?._id || p.clientId?.email === currentUser?.email) {
+              clientProjectIds.add(p._id);
+            }
+          });
+        } catch (e) {}
+      }
+
+      if (data && Array.isArray(data)) {
+        const filtered = data.filter(
+          (u) =>
+            (clientProjectIds.has(u.projectId) || clientProjectIds.has(u.projectId?._id)) &&
+            u.visibility !== 'Internal Only'
+        );
+        setUpdates(filtered);
+      } else {
+        setUpdates([]);
+      }
     } catch (err) {
-      console.log('Using default client verified updates.');
+      setUpdates([]);
     }
   };
 
@@ -58,7 +59,12 @@ export default function ClientDailyUpdates() {
       </div>
 
       <div className="space-y-4">
-        {updates.map((item) => (
+        {updates.length === 0 ? (
+          <div className="p-12 text-center text-slate-500 text-xs bg-slate-900 border border-slate-800 rounded-2xl">
+            No verified daily activity logs for your assigned project yet.
+          </div>
+        ) : (
+          updates.map((item) => (
           <div key={item._id} className="p-5 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-white flex items-center gap-2">
@@ -120,7 +126,8 @@ export default function ClientDailyUpdates() {
               </span>
             </div>
           </div>
-        ))}
+        ))
+      )}
       </div>
     </div>
   );
