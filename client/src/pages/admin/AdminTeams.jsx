@@ -57,7 +57,28 @@ export default function AdminTeams() {
       });
 
       if (Array.isArray(data)) {
-        setUsers(data);
+        // Merge any locally added/invited users from initialMockUsers not yet present in server response
+        const serverIds = new Set(data.map((u) => u._id || u.email));
+        const localAdded = initialMockUsers.filter(
+          (u) => !serverIds.has(u._id) && !serverIds.has(u.email)
+        );
+
+        let merged = [...localAdded, ...data];
+
+        if (selectedRole !== 'All') {
+          merged = merged.filter((u) => u.role === selectedRole);
+        }
+
+        if (selectedDept !== 'All') {
+          merged = merged.filter((u) => {
+            if (u.departmentNames && u.departmentNames.includes(selectedDept)) return true;
+            if (typeof u.department === 'string' && u.department === selectedDept) return true;
+            if (Array.isArray(u.department) && u.department.some((d) => d.name === selectedDept || d === selectedDept)) return true;
+            return false;
+          });
+        }
+
+        setUsers(merged);
       }
     } catch (err) {
       // Fallback filtering on mock list
@@ -84,20 +105,32 @@ export default function AdminTeams() {
 
   const handleUserCreated = (newUser) => {
     if (newUser) {
-      setUsers((prev) => [newUser, ...prev]);
+      if (!newUser._id) newUser._id = `usr_${Date.now()}`;
+      if (!initialMockUsers.some((u) => u._id === newUser._id || u.email === newUser.email)) {
+        initialMockUsers.unshift(newUser);
+      }
+      setUsers((prev) => [newUser, ...prev.filter((u) => u._id !== newUser._id && u.email !== newUser.email)]);
       fetchUsers();
     }
   };
 
   const handleUserInvited = (newUser) => {
     if (newUser) {
-      initialMockUsers.unshift(newUser);
+      if (!newUser._id) newUser._id = `usr_inv_${Date.now()}`;
+      if (!initialMockUsers.some((u) => u._id === newUser._id || u.email === newUser.email)) {
+        initialMockUsers.unshift(newUser);
+      }
+      setUsers((prev) => [newUser, ...prev.filter((u) => u._id !== newUser._id && u.email !== newUser.email)]);
       fetchUsers();
     }
   };
 
   const handleUserUpdated = (updatedUser) => {
     if (updatedUser) {
+      const idx = initialMockUsers.findIndex((u) => u._id === updatedUser._id || u.email === updatedUser.email);
+      if (idx !== -1) {
+        initialMockUsers[idx] = { ...initialMockUsers[idx], ...updatedUser };
+      }
       setUsers((prev) => prev.map((u) => (u._id === updatedUser._id ? updatedUser : u)));
     }
   };
