@@ -5,24 +5,41 @@ import { api } from '../../services/api';
 import EditProjectModal from '../../components/EditProjectModal';
 import RichTextEditor from '../../components/RichTextEditor';
 
+const defaultProjects = [
+  {
+    _id: 'prj_1',
+    title: 'Acme E-Commerce Redesign & SEO',
+    description: 'Comprehensive redesign and search engine optimization audit for Acme Corp online platform.',
+    clientId: { _id: 'usr_5', name: 'Acme Corp (Robert Taylor)', email: 'client@acmecorp.com' },
+    status: 'In Progress',
+    progressPercentage: 65,
+    startDate: '2026-09-01',
+    expectedDelivery: '2026-11-15',
+    assignedTeam: [
+      { _id: 'usr_2', name: 'Sarah Jenkins', department: 'Design' },
+      { _id: 'usr_3', name: 'David Miller', department: 'Development' },
+    ],
+  },
+];
+
+const getStoredProjects = () => {
+  try {
+    const saved = localStorage.getItem('pensdeo_projects');
+    return saved ? JSON.parse(saved) : defaultProjects;
+  } catch (e) {
+    return defaultProjects;
+  }
+};
+
+const saveProjectsToStorage = (list) => {
+  try {
+    localStorage.setItem('pensdeo_projects', JSON.stringify(list));
+  } catch (e) {}
+};
+
 export default function AdminProjects() {
   const { token } = useAppStore();
-  const [projects, setProjects] = useState([
-    {
-      _id: 'prj_1',
-      title: 'Acme E-Commerce Redesign & SEO',
-      description: 'Comprehensive redesign and search engine optimization audit for Acme Corp online platform.',
-      clientId: { _id: 'usr_5', name: 'Acme Corp (Robert Taylor)', email: 'client@acmecorp.com' },
-      status: 'In Progress',
-      progressPercentage: 65,
-      startDate: '2026-09-01',
-      expectedDelivery: '2026-11-15',
-      assignedTeam: [
-        { _id: 'usr_2', name: 'Sarah Jenkins', department: 'Design' },
-        { _id: 'usr_3', name: 'David Miller', department: 'Development' },
-      ],
-    },
-  ]);
+  const [projects, setProjects] = useState(getStoredProjects());
 
   const [usersList, setUsersList] = useState([
     { _id: 'usr_5', name: 'Acme Corp (Robert Taylor)', role: 'Client' },
@@ -55,19 +72,25 @@ export default function AdminProjects() {
         api.getProjects(token).catch(() => null),
         api.getUsers(token).catch(() => null),
       ]);
-      if (fetchedProjects) setProjects(fetchedProjects);
-      if (fetchedUsers) setUsersList(fetchedUsers);
+      if (Array.isArray(fetchedProjects) && fetchedProjects.length > 0) {
+        setProjects(fetchedProjects);
+        saveProjectsToStorage(fetchedProjects);
+      }
+      if (Array.isArray(fetchedUsers) && fetchedUsers.length > 0) {
+        setUsersList(fetchedUsers);
+      }
     } catch (err) {
-      console.log('Using default mock project data.');
+      console.log('Using local/stored mock project data.');
     }
   };
 
   const handleCreateProject = async (e) => {
     e.preventDefault();
+    let newProjectsList = [];
     try {
       const created = await api.createProject(formData, token);
       if (created) {
-        setProjects([created, ...projects]);
+        newProjectsList = [created, ...projects];
       }
     } catch (err) {
       const mockNew = {
@@ -76,8 +99,12 @@ export default function AdminProjects() {
         clientId: usersList.find((u) => u._id === formData.clientId) || { name: 'Client Account' },
         progressPercentage: 0,
       };
-      setProjects([mockNew, ...projects]);
+      newProjectsList = [mockNew, ...projects];
     } finally {
+      if (newProjectsList.length > 0) {
+        setProjects(newProjectsList);
+        saveProjectsToStorage(newProjectsList);
+      }
       setShowModal(false);
       setFormData({
         title: '',
@@ -95,26 +122,38 @@ export default function AdminProjects() {
     try {
       const res = await api.calculateProjectProgress(projectId, token);
       if (res && res.progressPercentage !== undefined) {
-        setProjects((prev) =>
-          prev.map((p) => (p._id === projectId ? { ...p, progressPercentage: res.progressPercentage } : p))
-        );
+        setProjects((prev) => {
+          const updated = prev.map((p) => (p._id === projectId ? { ...p, progressPercentage: res.progressPercentage } : p));
+          saveProjectsToStorage(updated);
+          return updated;
+        });
       }
     } catch (err) {
-      setProjects((prev) =>
-        prev.map((p) => (p._id === projectId ? { ...p, progressPercentage: 100 } : p))
-      );
+      setProjects((prev) => {
+        const updated = prev.map((p) => (p._id === projectId ? { ...p, progressPercentage: 100 } : p));
+        saveProjectsToStorage(updated);
+        return updated;
+      });
     }
   };
 
   const handleProjectUpdated = (updatedProject) => {
     if (updatedProject) {
-      setProjects((prev) => prev.map((p) => (p._id === updatedProject._id ? updatedProject : p)));
+      setProjects((prev) => {
+        const updated = prev.map((p) => (p._id === updatedProject._id ? updatedProject : p));
+        saveProjectsToStorage(updated);
+        return updated;
+      });
     }
     fetchData();
   };
 
   const handleProjectDeleted = (deletedId) => {
-    setProjects((prev) => prev.filter((p) => p._id !== deletedId));
+    setProjects((prev) => {
+      const updated = prev.filter((p) => p._id !== deletedId);
+      saveProjectsToStorage(updated);
+      return updated;
+    });
   };
 
   return (

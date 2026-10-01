@@ -7,13 +7,30 @@ import EditUserModal from '../../components/EditUserModal';
 import CreateUserModal from '../../components/CreateUserModal';
 import ResetPasswordModal from '../../components/ResetPasswordModal';
 
-const initialMockUsers = [
+const defaultMockUsers = [
   { _id: 'usr_1', name: 'Alex Vance', email: 'admin@agency.com', role: 'SuperAdmin', departmentNames: ['Development'] },
   { _id: 'usr_2', name: 'Sarah Jenkins', email: 'sarah@agency.com', role: 'Manager', departmentNames: ['Design'] },
   { _id: 'usr_3', name: 'David Miller', email: 'david@agency.com', role: 'Employee', departmentNames: ['Development'] },
   { _id: 'usr_4', name: 'Elena Rostova', email: 'elena@agency.com', role: 'Employee', departmentNames: ['SEO'] },
   { _id: 'usr_5', name: 'Acme Corp (Robert T.)', email: 'client@acmecorp.com', role: 'Client', departmentNames: ['Marketing'] },
 ];
+
+const getStoredUsers = () => {
+  try {
+    const saved = localStorage.getItem('pensdeo_users');
+    return saved ? JSON.parse(saved) : defaultMockUsers;
+  } catch (e) {
+    return defaultMockUsers;
+  }
+};
+
+let initialMockUsers = getStoredUsers();
+
+const saveUsersToStorage = () => {
+  try {
+    localStorage.setItem('pensdeo_users', JSON.stringify(initialMockUsers));
+  } catch (e) {}
+};
 
 export default function AdminTeams() {
   const { token } = useAppStore();
@@ -108,6 +125,7 @@ export default function AdminTeams() {
       if (!newUser._id) newUser._id = `usr_${Date.now()}`;
       if (!initialMockUsers.some((u) => u._id === newUser._id || u.email === newUser.email)) {
         initialMockUsers.unshift(newUser);
+        saveUsersToStorage();
       }
       setUsers((prev) => [newUser, ...prev.filter((u) => u._id !== newUser._id && u.email !== newUser.email)]);
       fetchUsers();
@@ -119,6 +137,7 @@ export default function AdminTeams() {
       if (!newUser._id) newUser._id = `usr_inv_${Date.now()}`;
       if (!initialMockUsers.some((u) => u._id === newUser._id || u.email === newUser.email)) {
         initialMockUsers.unshift(newUser);
+        saveUsersToStorage();
       }
       setUsers((prev) => [newUser, ...prev.filter((u) => u._id !== newUser._id && u.email !== newUser.email)]);
       fetchUsers();
@@ -130,6 +149,7 @@ export default function AdminTeams() {
       const idx = initialMockUsers.findIndex((u) => u._id === updatedUser._id || u.email === updatedUser.email);
       if (idx !== -1) {
         initialMockUsers[idx] = { ...initialMockUsers[idx], ...updatedUser };
+        saveUsersToStorage();
       }
       setUsers((prev) => prev.map((u) => (u._id === updatedUser._id ? updatedUser : u)));
     }
