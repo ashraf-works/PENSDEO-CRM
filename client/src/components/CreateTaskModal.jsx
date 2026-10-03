@@ -5,6 +5,7 @@ import { api } from '../services/api';
 import RichTextEditor from './RichTextEditor';
 
 import { mergeUsersWithStorage, filterClients } from '../utils/userStorage';
+import { mergeProjectsWithStorage } from '../utils/projectStorage';
 
 export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, taskToEdit = null }) {
   const { token } = useAppStore();
@@ -36,17 +37,23 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, taskTo
   }, [isOpen, taskToEdit]);
 
   useEffect(() => {
-    if (clientId) {
-      const matched = projectsList.filter((p) => {
-        const pClientId = p.clientId?._id || p.clientId;
-        return pClientId === clientId;
-      });
-      setFilteredProjects(matched.length > 0 ? matched : projectsList);
-      if (matched.length > 0 && !matched.some((p) => p._id === projectId)) {
-        setProjectId(matched[0]._id);
+    if (projectsList.length > 0) {
+      if (clientId) {
+        const matched = projectsList.filter((p) => {
+          const pClientId = p.clientId?._id || p.clientId?.email || p.clientId;
+          return pClientId === clientId;
+        });
+        const resultList = matched.length > 0 ? matched : projectsList;
+        setFilteredProjects(resultList);
+        if (resultList.length > 0 && !resultList.some((p) => p._id === projectId)) {
+          setProjectId(resultList[0]._id);
+        }
+      } else {
+        setFilteredProjects(projectsList);
+        if (!projectId && projectsList.length > 0) {
+          setProjectId(projectsList[0]._id);
+        }
       }
-    } else {
-      setFilteredProjects(projectsList);
     }
   }, [clientId, projectsList]);
 
@@ -74,11 +81,9 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, taskTo
       setClientsList(clients);
       setEmployeesList(finalStaff);
 
-      let prjs = projectsData && projectsData.length > 0 ? projectsData : [
-        { _id: 'prj_1', title: 'Acme E-Commerce Redesign & SEO', clientId: clients[0]?._id || 'usr_5' },
-      ];
-
-      setProjectsList(prjs);
+      const allProjects = mergeProjectsWithStorage(projectsData);
+      setProjectsList(allProjects);
+      setFilteredProjects(allProjects);
 
       if (taskToEdit) {
         // Edit mode prefill
@@ -86,7 +91,8 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, taskTo
         setDescription(taskToEdit.description || '');
         const taskClientId = taskToEdit.clientId?._id || taskToEdit.clientId || clients[0]?._id || 'usr_5';
         setClientId(taskClientId);
-        setProjectId(taskToEdit.projectId?._id || taskToEdit.projectId || prjs[0]._id);
+        const taskProjectId = taskToEdit.projectId?._id || taskToEdit.projectId || allProjects[0]?._id || 'prj_1';
+        setProjectId(taskProjectId);
         setAssignedTo(taskToEdit.assignedTo?._id || taskToEdit.assignedTo || finalStaff[0]._id);
         setPriority(taskToEdit.priority || 'Medium');
         setStatus(taskToEdit.status || 'In Progress');
@@ -97,7 +103,7 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, taskTo
         setTitle('');
         setDescription('');
         setClientId(clients[0]?._id || 'usr_5');
-        setProjectId(prjs[0]._id);
+        setProjectId(allProjects[0]?._id || 'prj_1');
         setAssignedTo(finalStaff[0]._id);
         setPriority('Medium');
         setStatus('Not Started');

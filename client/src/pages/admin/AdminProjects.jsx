@@ -6,23 +6,7 @@ import EditProjectModal from '../../components/EditProjectModal';
 import RichTextEditor from '../../components/RichTextEditor';
 
 import { mergeUsersWithStorage, filterClients, getStoredUsers } from '../../utils/userStorage';
-
-const defaultProjects = [];
-
-const getStoredProjects = () => {
-  try {
-    const saved = localStorage.getItem('pensdeo_projects');
-    return saved ? JSON.parse(saved) : defaultProjects;
-  } catch (e) {
-    return defaultProjects;
-  }
-};
-
-const saveProjectsToStorage = (list) => {
-  try {
-    localStorage.setItem('pensdeo_projects', JSON.stringify(list));
-  } catch (e) {}
-};
+import { mergeProjectsWithStorage, saveProjectsListToStorage, getStoredProjects } from '../../utils/projectStorage';
 
 export default function AdminProjects() {
   const { token } = useAppStore();
@@ -56,14 +40,14 @@ export default function AdminProjects() {
         api.getProjects(token).catch(() => null),
         api.getUsers(token).catch(() => null),
       ]);
-      if (Array.isArray(fetchedProjects) && fetchedProjects.length > 0) {
-        setProjects(fetchedProjects);
-        saveProjectsToStorage(fetchedProjects);
-      }
+      const mergedPrjs = mergeProjectsWithStorage(fetchedProjects);
+      setProjects(mergedPrjs);
+
       const mergedUsers = mergeUsersWithStorage(fetchedUsers);
       setUsersList(mergedUsers);
     } catch (err) {
       console.log('Using local/stored mock project data.');
+      setProjects(getStoredProjects());
       setUsersList(getStoredUsers());
     }
   };
@@ -88,7 +72,7 @@ export default function AdminProjects() {
     } finally {
       if (newProjectsList.length > 0) {
         setProjects(newProjectsList);
-        saveProjectsToStorage(newProjectsList);
+        saveProjectsListToStorage(newProjectsList);
       }
       setShowModal(false);
       const currentClients = filterClients(usersList);
@@ -110,14 +94,14 @@ export default function AdminProjects() {
       if (res && res.progressPercentage !== undefined) {
         setProjects((prev) => {
           const updated = prev.map((p) => (p._id === projectId ? { ...p, progressPercentage: res.progressPercentage } : p));
-          saveProjectsToStorage(updated);
+          saveProjectsListToStorage(updated);
           return updated;
         });
       }
     } catch (err) {
       setProjects((prev) => {
         const updated = prev.map((p) => (p._id === projectId ? { ...p, progressPercentage: 100 } : p));
-        saveProjectsToStorage(updated);
+        saveProjectsListToStorage(updated);
         return updated;
       });
     }
@@ -127,7 +111,7 @@ export default function AdminProjects() {
     if (updatedProject) {
       setProjects((prev) => {
         const updated = prev.map((p) => (p._id === updatedProject._id ? updatedProject : p));
-        saveProjectsToStorage(updated);
+        saveProjectsListToStorage(updated);
         return updated;
       });
     }
@@ -137,7 +121,7 @@ export default function AdminProjects() {
   const handleProjectDeleted = (deletedId) => {
     setProjects((prev) => {
       const updated = prev.filter((p) => p._id !== deletedId);
-      saveProjectsToStorage(updated);
+      saveProjectsListToStorage(updated);
       return updated;
     });
   };
