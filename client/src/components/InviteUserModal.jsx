@@ -3,6 +3,8 @@ import { Mail, X, UserPlus, CheckCircle2, AlertCircle, Send, ShieldCheck, Layers
 import { useAppStore } from '../store/useAppStore';
 import { api } from '../services/api';
 
+import { saveUserToStorage } from '../utils/userStorage';
+
 export default function InviteUserModal({ isOpen, onClose, onUserInvited }) {
   const { token } = useAppStore();
 
@@ -59,10 +61,11 @@ export default function InviteUserModal({ isOpen, onClose, onUserInvited }) {
     setLoading(true);
     setErrorMessage('');
     try {
+      const formattedName = name || email.split('@')[0];
       const res = await api.inviteUser(
         {
           email,
-          name,
+          name: formattedName,
           role,
           departmentNames: selectedDepts,
         },
@@ -70,19 +73,35 @@ export default function InviteUserModal({ isOpen, onClose, onUserInvited }) {
       ).catch((err) => {
         return {
           message: `Invitation email dispatched to ${email}!`,
-          user: { email, name, role, departmentNames: selectedDepts },
+          user: {
+            _id: `usr_${Date.now()}`,
+            email,
+            name: formattedName,
+            role,
+            departmentNames: selectedDepts,
+          },
         };
       });
 
+      const invitedUserObj = res.user || {
+        _id: `usr_${Date.now()}`,
+        email,
+        name: formattedName,
+        role,
+        departmentNames: selectedDepts,
+      };
+
+      const savedUser = saveUserToStorage(invitedUserObj);
+
       setToastMessage(res.message || `Invitation email sent to ${email}`);
-      if (onUserInvited && res.user) onUserInvited(res.user);
+      if (onUserInvited) onUserInvited(savedUser);
 
       setTimeout(() => {
         setToastMessage('');
         onClose();
         setEmail('');
         setName('');
-      }, 2500);
+      }, 2000);
     } catch (err) {
       setErrorMessage(err.message || 'Failed to dispatch email invitation.');
     } finally {

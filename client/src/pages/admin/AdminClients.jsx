@@ -5,19 +5,12 @@ import { api } from '../../services/api';
 import InviteUserModal from '../../components/InviteUserModal';
 import EditUserModal from '../../components/EditUserModal';
 
+import { filterClients, mergeUsersWithStorage, saveUserToStorage, getStoredUsers } from '../../utils/userStorage';
+
 export default function AdminClients() {
   const { token } = useAppStore();
 
-  const [clients, setClients] = useState([
-    {
-      _id: 'usr_5',
-      name: 'Acme Corp (Robert Taylor)',
-      email: 'client@acmecorp.com',
-      role: 'Client',
-      departmentNames: ['Marketing', 'Design'],
-      assignedProjects: [{ _id: 'prj_1', title: 'Acme E-Commerce Redesign & SEO' }],
-    },
-  ]);
+  const [clients, setClients] = useState(filterClients(getStoredUsers()));
 
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [editingClient, setEditingClient] = useState(null);
@@ -29,24 +22,27 @@ export default function AdminClients() {
 
   const fetchClients = async () => {
     try {
-      const data = await api.getUsers(token, { role: 'Client' });
-      if (data && data.length > 0) setClients(data);
+      const data = await api.getUsers(token, { role: 'Client' }).catch(() => null);
+      const mergedAll = mergeUsersWithStorage(data);
+      const clientList = filterClients(mergedAll);
+      setClients(clientList);
     } catch (err) {
       console.log('Using default mock clients list.');
+      setClients(filterClients(getStoredUsers()));
     }
   };
 
   const handleClientInvited = (newClient) => {
     if (newClient) {
-      setClients([newClient, ...clients]);
+      saveUserToStorage(newClient);
+      fetchClients();
     }
   };
 
   const handleClientUpdated = (updatedClient) => {
     if (updatedClient) {
-      setClients((prev) =>
-        prev.map((c) => (c._id === updatedClient._id ? updatedClient : c))
-      );
+      saveUserToStorage(updatedClient);
+      fetchClients();
     }
   };
 

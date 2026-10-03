@@ -17,6 +17,8 @@ import { useAppStore } from '../../store/useAppStore';
 import { api } from '../../services/api';
 import ManagerReviewModal from '../../components/ManagerReviewModal';
 
+import { mergeUsersWithStorage, filterClients } from '../../utils/userStorage';
+
 export default function AdminOverview() {
   const { token } = useAppStore();
   const [loading, setLoading] = useState(false);
@@ -87,19 +89,18 @@ export default function AdminOverview() {
       if (fetchedProjects) setProjectsList(fetchedProjects);
       if (fetchedUpdates) setRecentUpdates(fetchedUpdates);
 
-      if (fetchedProjects || fetchedTasks || fetchedUsers) {
-        const clientCount = fetchedUsers ? fetchedUsers.filter((u) => u.role === 'Client').length : 1;
-        const activeProjCount = fetchedProjects ? fetchedProjects.filter((p) => p.status === 'In Progress').length : 1;
-        const tasksCount = fetchedTasks ? fetchedTasks.length : 2;
-        const blockedCount = fetchedTasks ? fetchedTasks.filter((t) => t.status === 'Blocked').length : 0;
+      const allUsers = mergeUsersWithStorage(fetchedUsers);
+      const clientCount = filterClients(allUsers).length;
+      const activeProjCount = fetchedProjects ? fetchedProjects.filter((p) => p.status === 'In Progress').length : 1;
+      const tasksCount = fetchedTasks ? fetchedTasks.length : 2;
+      const blockedCount = fetchedTasks ? fetchedTasks.filter((t) => t.status === 'Blocked').length : 0;
 
-        setStats({
-          totalClients: clientCount || 1,
-          activeProjects: activeProjCount || 1,
-          tasksToday: tasksCount || 2,
-          blockedTasks: blockedCount || 0,
-        });
-      }
+      setStats({
+        totalClients: clientCount,
+        activeProjects: activeProjCount || 1,
+        tasksToday: tasksCount || 2,
+        blockedTasks: blockedCount || 0,
+      });
     } catch (err) {
       console.log('Using default mock stats for Admin Overview.');
     } finally {

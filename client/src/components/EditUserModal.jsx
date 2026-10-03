@@ -3,6 +3,8 @@ import { UserCheck, X, Layers, CheckCircle2, AlertCircle, Send, ShieldCheck } fr
 import { useAppStore } from '../store/useAppStore';
 import { api } from '../services/api';
 
+import { saveUserToStorage } from '../utils/userStorage';
+
 export default function EditUserModal({ isOpen, onClose, user, onUserUpdated }) {
   const { token } = useAppStore();
 
@@ -83,8 +85,10 @@ export default function EditUserModal({ isOpen, onClose, user, onUserUpdated }) 
         };
       });
 
+      const savedUser = saveUserToStorage(updated);
+
       setSuccessMessage('User departments and details updated successfully!');
-      if (onUserUpdated) onUserUpdated(updated);
+      if (onUserUpdated) onUserUpdated(savedUser);
 
       setTimeout(() => {
         setSuccessMessage('');

@@ -19,7 +19,8 @@ const getUsers = async (req, res) => {
         : role;
       
       if (rolesArray.length > 0) {
-        queryConditions.push({ role: { $in: rolesArray } });
+        const roleRegexes = rolesArray.map((r) => new RegExp(`^${r}$`, 'i'));
+        queryConditions.push({ role: { $in: roleRegexes } });
       }
     }
 

@@ -7,34 +7,11 @@ import EditUserModal from '../../components/EditUserModal';
 import CreateUserModal from '../../components/CreateUserModal';
 import ResetPasswordModal from '../../components/ResetPasswordModal';
 
-const defaultMockUsers = [
-  { _id: 'usr_1', name: 'Alex Vance', email: 'admin@agency.com', role: 'SuperAdmin', departmentNames: ['Development'] },
-  { _id: 'usr_2', name: 'Sarah Jenkins', email: 'sarah@agency.com', role: 'Manager', departmentNames: ['Design'] },
-  { _id: 'usr_3', name: 'David Miller', email: 'david@agency.com', role: 'Employee', departmentNames: ['Development'] },
-  { _id: 'usr_4', name: 'Elena Rostova', email: 'elena@agency.com', role: 'Employee', departmentNames: ['SEO'] },
-  { _id: 'usr_5', name: 'Acme Corp (Robert T.)', email: 'client@acmecorp.com', role: 'Client', departmentNames: ['Marketing'] },
-];
-
-const getStoredUsers = () => {
-  try {
-    const saved = localStorage.getItem('pensdeo_users');
-    return saved ? JSON.parse(saved) : defaultMockUsers;
-  } catch (e) {
-    return defaultMockUsers;
-  }
-};
-
-let initialMockUsers = getStoredUsers();
-
-const saveUsersToStorage = () => {
-  try {
-    localStorage.setItem('pensdeo_users', JSON.stringify(initialMockUsers));
-  } catch (e) {}
-};
+import { getStoredUsers, saveUserToStorage, mergeUsersWithStorage } from '../../utils/userStorage';
 
 export default function AdminTeams() {
   const { token } = useAppStore();
-  const [users, setUsers] = useState(initialMockUsers);
+  const [users, setUsers] = useState(getStoredUsers());
   const [departmentsList, setDepartmentsList] = useState([]);
   const [selectedRole, setSelectedRole] = useState('All');
   const [selectedDept, setSelectedDept] = useState('All');
@@ -71,42 +48,16 @@ export default function AdminTeams() {
       const data = await api.getUsers(token, {
         role: selectedRole,
         department: selectedDept,
-      });
+      }).catch(() => null);
 
-      if (Array.isArray(data)) {
-        // Merge any locally added/invited users from initialMockUsers not yet present in server response
-        const serverIds = new Set(data.map((u) => u._id || u.email));
-        const localAdded = initialMockUsers.filter(
-          (u) => !serverIds.has(u._id) && !serverIds.has(u.email)
-        );
-
-        let merged = [...localAdded, ...data];
-
-        if (selectedRole !== 'All') {
-          merged = merged.filter((u) => u.role === selectedRole);
-        }
-
-        if (selectedDept !== 'All') {
-          merged = merged.filter((u) => {
-            if (u.departmentNames && u.departmentNames.includes(selectedDept)) return true;
-            if (typeof u.department === 'string' && u.department === selectedDept) return true;
-            if (Array.isArray(u.department) && u.department.some((d) => d.name === selectedDept || d === selectedDept)) return true;
-            return false;
-          });
-        }
-
-        setUsers(merged);
-      }
-    } catch (err) {
-      // Fallback filtering on mock list
-      let filtered = [...initialMockUsers];
+      let merged = mergeUsersWithStorage(data);
 
       if (selectedRole !== 'All') {
-        filtered = filtered.filter((u) => u.role === selectedRole);
+        merged = merged.filter((u) => u.role && u.role.toLowerCase() === selectedRole.toLowerCase());
       }
 
       if (selectedDept !== 'All') {
-        filtered = filtered.filter((u) => {
+        merged = merged.filter((u) => {
           if (u.departmentNames && u.departmentNames.includes(selectedDept)) return true;
           if (typeof u.department === 'string' && u.department === selectedDept) return true;
           if (Array.isArray(u.department) && u.department.some((d) => d.name === selectedDept || d === selectedDept)) return true;
@@ -114,7 +65,9 @@ export default function AdminTeams() {
         });
       }
 
-      setUsers(filtered);
+      setUsers(merged);
+    } catch (err) {
+      setUsers(getStoredUsers());
     } finally {
       setLoading(false);
     }
@@ -122,36 +75,22 @@ export default function AdminTeams() {
 
   const handleUserCreated = (newUser) => {
     if (newUser) {
-      if (!newUser._id) newUser._id = `usr_${Date.now()}`;
-      if (!initialMockUsers.some((u) => u._id === newUser._id || u.email === newUser.email)) {
-        initialMockUsers.unshift(newUser);
-        saveUsersToStorage();
-      }
-      setUsers((prev) => [newUser, ...prev.filter((u) => u._id !== newUser._id && u.email !== newUser.email)]);
+      saveUserToStorage(newUser);
       fetchUsers();
     }
   };
 
   const handleUserInvited = (newUser) => {
     if (newUser) {
-      if (!newUser._id) newUser._id = `usr_inv_${Date.now()}`;
-      if (!initialMockUsers.some((u) => u._id === newUser._id || u.email === newUser.email)) {
-        initialMockUsers.unshift(newUser);
-        saveUsersToStorage();
-      }
-      setUsers((prev) => [newUser, ...prev.filter((u) => u._id !== newUser._id && u.email !== newUser.email)]);
+      saveUserToStorage(newUser);
       fetchUsers();
     }
   };
 
   const handleUserUpdated = (updatedUser) => {
     if (updatedUser) {
-      const idx = initialMockUsers.findIndex((u) => u._id === updatedUser._id || u.email === updatedUser.email);
-      if (idx !== -1) {
-        initialMockUsers[idx] = { ...initialMockUsers[idx], ...updatedUser };
-        saveUsersToStorage();
-      }
-      setUsers((prev) => prev.map((u) => (u._id === updatedUser._id ? updatedUser : u)));
+      saveUserToStorage(updatedUser);
+      fetchUsers();
     }
   };
 

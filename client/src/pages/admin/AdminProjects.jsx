@@ -5,6 +5,8 @@ import { api } from '../../services/api';
 import EditProjectModal from '../../components/EditProjectModal';
 import RichTextEditor from '../../components/RichTextEditor';
 
+import { mergeUsersWithStorage, filterClients, getStoredUsers } from '../../utils/userStorage';
+
 const defaultProjects = [];
 
 const getStoredProjects = () => {
@@ -26,21 +28,18 @@ export default function AdminProjects() {
   const { token } = useAppStore();
   const [projects, setProjects] = useState(getStoredProjects());
 
-  const [usersList, setUsersList] = useState([
-    { _id: 'usr_5', name: 'Acme Corp (Robert Taylor)', role: 'Client' },
-    { _id: 'usr_2', name: 'Sarah Jenkins', role: 'Manager', department: 'Design' },
-    { _id: 'usr_3', name: 'David Miller', role: 'Employee', department: 'Development' },
-    { _id: 'usr_4', name: 'Elena Rostova', role: 'Employee', department: 'SEO' },
-  ]);
+  const [usersList, setUsersList] = useState(getStoredUsers());
 
   const [showModal, setShowModal] = useState(false);
   const [editingProject, setEditingProject] = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
 
+  const initialClients = filterClients(usersList);
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    clientId: 'usr_5',
+    clientId: initialClients[0]?._id || 'usr_5',
     status: 'In Progress',
     startDate: '',
     expectedDelivery: '',
@@ -61,11 +60,11 @@ export default function AdminProjects() {
         setProjects(fetchedProjects);
         saveProjectsToStorage(fetchedProjects);
       }
-      if (Array.isArray(fetchedUsers) && fetchedUsers.length > 0) {
-        setUsersList(fetchedUsers);
-      }
+      const mergedUsers = mergeUsersWithStorage(fetchedUsers);
+      setUsersList(mergedUsers);
     } catch (err) {
       console.log('Using local/stored mock project data.');
+      setUsersList(getStoredUsers());
     }
   };
 
@@ -78,10 +77,11 @@ export default function AdminProjects() {
         newProjectsList = [created, ...projects];
       }
     } catch (err) {
+      const selectedClientObj = usersList.find((u) => u._id === formData.clientId) || initialClients[0] || { name: 'Client Account' };
       const mockNew = {
         _id: `prj_${Date.now()}`,
         ...formData,
-        clientId: usersList.find((u) => u._id === formData.clientId) || { name: 'Client Account' },
+        clientId: selectedClientObj,
         progressPercentage: 0,
       };
       newProjectsList = [mockNew, ...projects];
@@ -91,10 +91,11 @@ export default function AdminProjects() {
         saveProjectsToStorage(newProjectsList);
       }
       setShowModal(false);
+      const currentClients = filterClients(usersList);
       setFormData({
         title: '',
         description: '',
-        clientId: 'usr_5',
+        clientId: currentClients[0]?._id || 'usr_5',
         status: 'In Progress',
         startDate: '',
         expectedDelivery: '',
@@ -293,13 +294,11 @@ export default function AdminProjects() {
                     onChange={(e) => setFormData({ ...formData, clientId: e.target.value })}
                     className="w-full bg-slate-950 text-xs px-3 py-2.5 rounded-xl border border-slate-800 text-slate-200 focus:outline-none focus:border-indigo-500"
                   >
-                    {usersList
-                      .filter((u) => u.role === 'Client')
-                      .map((c) => (
-                        <option key={c._id} value={c._id}>
-                          {c.name}
-                        </option>
-                      ))}
+                    {filterClients(usersList).map((c) => (
+                      <option key={c._id} value={c._id}>
+                        {c.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
 

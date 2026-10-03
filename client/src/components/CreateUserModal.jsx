@@ -3,6 +3,8 @@ import { UserPlus, X, Layers, CheckCircle2, AlertCircle, Send, Key, User, Mail }
 import { useAppStore } from '../store/useAppStore';
 import { api } from '../services/api';
 
+import { saveUserToStorage } from '../utils/userStorage';
+
 export default function CreateUserModal({ isOpen, onClose, onUserCreated }) {
   const { token } = useAppStore();
 
@@ -82,8 +84,10 @@ export default function CreateUserModal({ isOpen, onClose, onUserCreated }) {
         };
       });
 
+      const savedUser = saveUserToStorage(res);
+
       setToastMessage(`User "${name}" created successfully!`);
-      if (onUserCreated) onUserCreated(res);
+      if (onUserCreated) onUserCreated(savedUser);
 
       setTimeout(() => {
         setToastMessage('');

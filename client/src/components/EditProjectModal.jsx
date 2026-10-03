@@ -4,6 +4,8 @@ import { useAppStore } from '../store/useAppStore';
 import { api } from '../services/api';
 import RichTextEditor from './RichTextEditor';
 
+import { mergeUsersWithStorage, filterClients } from '../utils/userStorage';
+
 export default function EditProjectModal({ isOpen, onClose, project, onProjectUpdated, onProjectDeleted }) {
   const { token } = useAppStore();
 
@@ -42,18 +44,11 @@ export default function EditProjectModal({ isOpen, onClose, project, onProjectUp
   const fetchUsers = async () => {
     try {
       const users = await api.getUsers(token).catch(() => []);
-      if (users && users.length > 0) {
-        setUsersList(users);
-      } else {
-        setUsersList([
-          { _id: 'usr_5', name: 'Acme Corp (Robert Taylor)', role: 'Client' },
-          { _id: 'usr_2', name: 'Sarah Jenkins', role: 'Manager', department: 'Design' },
-          { _id: 'usr_3', name: 'David Miller', role: 'Employee', department: 'Development' },
-          { _id: 'usr_4', name: 'Elena Rostova', role: 'Employee', department: 'SEO' },
-        ]);
-      }
+      const merged = mergeUsersWithStorage(users);
+      setUsersList(merged);
     } catch (err) {
       console.log('Using fallback users list.');
+      setUsersList(mergeUsersWithStorage([]));
     }
   };
 
@@ -178,13 +173,11 @@ export default function EditProjectModal({ isOpen, onClose, project, onProjectUp
                 onChange={(e) => setClientId(e.target.value)}
                 className="w-full bg-slate-950 text-xs px-3 py-2.5 rounded-xl border border-slate-800 text-slate-200 focus:outline-none focus:border-indigo-500"
               >
-                {usersList
-                  .filter((u) => u.role === 'Client')
-                  .map((c) => (
-                    <option key={c._id} value={c._id}>
-                      {c.name}
-                    </option>
-                  ))}
+                {filterClients(usersList).map((c) => (
+                  <option key={c._id} value={c._id}>
+                    {c.name}
+                  </option>
+                ))}
               </select>
             </div>
 

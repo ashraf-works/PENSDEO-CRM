@@ -4,6 +4,8 @@ import { useAppStore } from '../store/useAppStore';
 import { api } from '../services/api';
 import RichTextEditor from './RichTextEditor';
 
+import { mergeUsersWithStorage, filterClients } from '../utils/userStorage';
+
 export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, taskToEdit = null }) {
   const { token } = useAppStore();
 
@@ -56,30 +58,24 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, taskTo
         api.getUsers(token).catch(() => []),
       ]);
 
-      let clients = [];
-      let staff = [];
+      const allUsers = mergeUsersWithStorage(usersData);
+      const clients = filterClients(allUsers);
+      const staff = allUsers.filter(
+        (u) => u.role && (u.role.toLowerCase() === 'employee' || u.role.toLowerCase() === 'manager' || u.role.toLowerCase() === 'superadmin')
+      );
 
-      if (usersData && usersData.length > 0) {
-        clients = usersData.filter((u) => u.role === 'Client');
-        staff = usersData.filter((u) => u.role === 'Employee' || u.role === 'Manager');
-      }
+      const defaultStaff = [
+        { _id: 'usr_3', name: 'David Miller', role: 'Employee', department: 'Development' },
+        { _id: 'usr_2', name: 'Sarah Jenkins', role: 'Manager', department: 'Design' },
+      ];
 
-      if (clients.length === 0) {
-        clients = [{ _id: 'usr_5', name: 'Acme Corp (Robert Taylor)', role: 'Client' }];
-      }
-
-      if (staff.length === 0) {
-        staff = [
-          { _id: 'usr_3', name: 'David Miller', role: 'Employee', department: 'Development' },
-          { _id: 'usr_2', name: 'Sarah Jenkins', role: 'Manager', department: 'Design' },
-        ];
-      }
+      const finalStaff = staff.length > 0 ? staff : defaultStaff;
 
       setClientsList(clients);
-      setEmployeesList(staff);
+      setEmployeesList(finalStaff);
 
       let prjs = projectsData && projectsData.length > 0 ? projectsData : [
-        { _id: 'prj_1', title: 'Acme E-Commerce Redesign & SEO', clientId: clients[0]._id },
+        { _id: 'prj_1', title: 'Acme E-Commerce Redesign & SEO', clientId: clients[0]?._id || 'usr_5' },
       ];
 
       setProjectsList(prjs);
@@ -88,10 +84,10 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, taskTo
         // Edit mode prefill
         setTitle(taskToEdit.title || '');
         setDescription(taskToEdit.description || '');
-        const taskClientId = taskToEdit.clientId?._id || taskToEdit.clientId || clients[0]._id;
+        const taskClientId = taskToEdit.clientId?._id || taskToEdit.clientId || clients[0]?._id || 'usr_5';
         setClientId(taskClientId);
         setProjectId(taskToEdit.projectId?._id || taskToEdit.projectId || prjs[0]._id);
-        setAssignedTo(taskToEdit.assignedTo?._id || taskToEdit.assignedTo || staff[0]._id);
+        setAssignedTo(taskToEdit.assignedTo?._id || taskToEdit.assignedTo || finalStaff[0]._id);
         setPriority(taskToEdit.priority || 'Medium');
         setStatus(taskToEdit.status || 'In Progress');
         setDueDate(taskToEdit.dueDate ? taskToEdit.dueDate.substring(0, 10) : '');
@@ -100,9 +96,9 @@ export default function CreateTaskModal({ isOpen, onClose, onTaskCreated, taskTo
         // Create mode prefill
         setTitle('');
         setDescription('');
-        setClientId(clients[0]._id);
+        setClientId(clients[0]?._id || 'usr_5');
         setProjectId(prjs[0]._id);
-        setAssignedTo(staff[0]._id);
+        setAssignedTo(finalStaff[0]._id);
         setPriority('Medium');
         setStatus('Not Started');
         setDueDate('');
